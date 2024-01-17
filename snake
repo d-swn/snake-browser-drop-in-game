@@ -1,0 +1,347 @@
+data:text/html,
+
+<style>
+    body {
+        font-family: sans-serif;
+    }
+
+    [id=container] {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+   [id=start] {
+     margin: 20px;
+     border-radius: 5px;
+     width: 200px;
+     border:none;
+     font-size: 20px;
+   }
+
+   [id=start]:hover {
+    cursor: pointer;
+   }
+
+   [id=fieldContainer]{
+    display: flex;
+    justify-content: center;
+   }
+
+   [id=gameOver]{
+    display: none;
+    text-align: center;
+    font-size: 40px;
+   }
+
+   .food{
+    border-radius: 10px;
+   }
+
+</style>
+<html>
+    <body>
+        <div id="container">
+            <h2 id="score">Score: 0</h2>
+            <div id="fieldContainer">
+                <div id="field"></div>
+            </div>
+            <div id="configContainer">
+                <button id="start">Start Game</button>
+                <div    id="config">
+                            <input id="die-on-wall" type="checkbox">
+                            <label >die on wall</label>
+                    <fieldset id="gamespeed-config">
+                          <input type="radio" id="slow" name="speed" value="slow"/>
+                          <label>slow</label>
+                          <input type="radio"   checked id="medium" name="speed" value="medium"/>
+                          <label>medium</label>
+                          <input type="radio" id="fast" name="speed"  value="fast"/>
+                          <label>fast</label>
+                </div>
+            </div>
+            <h2 id="gameOver">GAME OVER</h2>
+            <div id="touchsurface">
+
+            </div>
+        </div>
+    </body>
+</html>
+<script>
+var SIZE_GRID = 20;
+var SIZE_BOX = 28;
+var BORDER = 1;
+var START_PLAYER = 69;
+var PLAYER_COLOR = 'black';
+var FOOD_COLOR = 'green';
+var TILE_COLOR = 'white';
+var GAME_SPEED = 250;
+var WALL_MODE = false;
+var idCounter;
+var gameField = document.getElementById("field");
+var score = document.getElementById("score");
+var startButton = document.getElementById("start");
+var gameSpeedSetting= document.getElementById("gamespeed-config");
+var dieOnWallSetting= document.getElementById("die-on-wall");
+
+var player = {
+    pos: undefined,
+    trail: [],
+    lastAction: undefined,
+    nextAction: 'ArrowDown',
+    consumed: 1
+};
+
+var food = {
+    pos: undefined
+};
+
+function getRandomNumber(max){
+    return Math.floor(Math.random()*max);
+}
+
+function spawnFood(){
+    var rand = getRandomNumber(idCounter);
+        
+    while(player.trail.includes(rand)){
+        rand = getRandomNumber(idCounter);
+    }
+
+    food.pos = rand;
+    var foodTile = document.getElementById(`${food.pos}`);
+    foodTile.className += " food";
+    foodTile.style.backgroundColor = FOOD_COLOR;
+}
+
+function registerAction (action) {
+    if( player.lastAction === 'ArrowDown' && action === 'ArrowUp'    || 
+        player.lastAction === 'ArrowUp' && action === 'ArrowDown'    ||
+        player.lastAction === 'ArrowLeft' && action === 'ArrowRight' ||        
+        player.lastAction === 'ArrowRight' && action === 'ArrowLeft'
+    ){
+        return;
+    }
+
+    player.nextAction = action;
+}
+
+function move(keyEvent){
+
+    if(keyEvent === 'ArrowDown'){
+        var playerPos = getPlayerHead();
+        var newPosPlayer;
+        player.nextAction = 'ArrowDown';
+        
+        if(playerPos > idCounter - SIZE_GRID-1){
+            if(WALL_MODE){
+                gameOver();
+                return;
+            }
+            newPosPlayer = (playerPos) % SIZE_GRID;
+        }else{
+            newPosPlayer = playerPos + SIZE_GRID
+        }
+        player.lastAction = keyEvent;
+
+        setPlayer(newPosPlayer);
+    }
+
+    if(keyEvent === 'ArrowUp'){
+        var playerPos = getPlayerHead();
+        player.nextAction = 'ArrowUp';
+        if(playerPos < SIZE_GRID){
+            if(WALL_MODE){
+                gameOver();
+                return;
+            }
+            newPosPlayer =  idCounter - SIZE_GRID + playerPos ;
+        }else{
+            newPosPlayer = playerPos - SIZE_GRID;
+        }
+        player.lastAction = keyEvent;
+
+        setPlayer(newPosPlayer);
+    }
+
+    if(keyEvent === 'ArrowLeft'){
+        var playerPos = getPlayerHead();
+        var newPosPlayer;
+        player.nextAction = 'ArrowLeft';
+
+        if(playerPos % SIZE_GRID === 0){
+            if(WALL_MODE){
+                gameOver();
+                return;
+
+            }
+            newPosPlayer =playerPos + SIZE_GRID-1;
+        }else{
+            newPosPlayer = playerPos - 1;
+        }
+        player.lastAction = keyEvent;
+
+        setPlayer(newPosPlayer);
+    }
+
+    if(keyEvent === 'ArrowRight'){        
+        var playerPos = getPlayerHead();
+        var newPosPlayer;
+        player.nextAction = 'ArrowRight';
+
+        if(playerPos % SIZE_GRID === (SIZE_GRID-1)){
+            if(WALL_MODE){
+                gameOver();
+                return;
+
+            }
+            newPosPlayer = playerPos - (SIZE_GRID-1);
+        }else{
+            newPosPlayer = playerPos + 1;
+        }
+
+        player.lastAction = keyEvent;
+
+        setPlayer(newPosPlayer);
+    }
+}
+
+function checkWallMode(){}
+
+function getPlayerHead(){
+    return player.pos;
+}
+
+function getPlayerTile(){
+    var id = getPlayerHead();
+    return document.getElementById(`${id}`);
+}
+
+function setPlayer(newPos){
+    if(player.trail.includes(newPos)){
+        gameOver();
+    }
+        
+    player.trail.push(newPos);
+
+    if(newPos === food.pos){
+        score.innerText = `Score: ${player.consumed}`;
+        document.getElementById(`${food.pos}`).style.borderRadius = 0;
+        player.consumed += 1;
+        spawnFood();
+    }
+
+    if(player.trail.length > player.consumed){
+        document.getElementById(player.trail[0]).style.backgroundColor = TILE_COLOR;
+        player.trail.shift();
+    }
+
+    player.pos = newPos;
+
+    drawPlayer();
+}
+
+function drawPlayer(){
+    var playerTile = getPlayerTile();
+    playerTile.style.backgroundColor = PLAYER_COLOR;
+}
+
+
+function setField () {
+
+    gameField.style.width = `${SIZE_GRID*(SIZE_BOX+BORDER*2)}px`;
+    gameField.style.display = 'flex';
+    gameField.style.flexWrap = 'wrap';
+    gameField.style.alignContent = 'flex-start';
+    gameField.style.margin = '0';
+
+    for(var i=0; i < SIZE_GRID; i++){
+        for(var k = 0; k < SIZE_GRID-1; k++){
+            var gridItem = document.createElement('div');
+            gridItem.id = idCounter++;
+            gridItem.style = `width: ${SIZE_BOX}; height: ${SIZE_BOX}; border: ${BORDER}px solid lightgray;`;
+            gameField.appendChild(gridItem);
+        }
+    }
+}
+
+function continuesMovement () {
+    window.gameLoop = setInterval(function(){ 
+        move(player.nextAction);
+    }, GAME_SPEED);
+}
+
+function start() {
+    document.getElementById('gameOver').style.display = "none";
+    startButton.style.display = 'none';
+    WALL_MODE = dieOnWallSetting.checked ? true : false;
+
+    var inputs = gameSpeedSetting.getElementsByTagName('input');
+    var checkedValue = null;
+    for (var i = 0; i < inputs.length; i++) {
+    if (inputs[i].checked) {
+        checkedValue = inputs[i].value;
+        break;
+        }
+    }
+
+
+    if(checkedValue === 'slow'){
+        GAME_SPEED = 250;
+    }else if(checkedValue === 'medium'){
+        GAME_SPEED = 200;
+    }else if(checkedValue === 'fast'){
+        GAME_SPEED = 100;
+    }
+
+    setField();
+    addListener();
+    setPlayer(START_PLAYER);
+    spawnFood();
+    continuesMovement();
+}
+
+function gameOver(){
+    if(window.gameLoop != undefined && window.gameLoop != 'undefined'){
+            window.clearInterval(window.gameLoop);
+    }
+
+    document.getElementById('gameOver').style.display = "block";
+    startButton.style.display = 'block';
+
+}
+
+function addListener () {
+    document.addEventListener('keydown', (event) => {
+    registerAction(event.code);
+  },false);
+  
+}
+
+function main() {
+    startButton.addEventListener('click', function(event){
+        if(window.gameLoop != undefined && window.gameLoop != 'undefined'){
+            window.clearInterval(window.gameLoop);
+        }
+        gameField.innerHTML = '';
+        startButton.innerText = 'Restart';
+        idCounter = 0;
+         player = {
+            pos: undefined,
+            trail: [],
+            lastAction: undefined,
+            nextAction: 'ArrowDown',
+            consumed: 1
+        };
+
+       food = {
+            pos: undefined
+        };
+
+        start();
+    });
+}
+
+main();
+
+</script>
